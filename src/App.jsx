@@ -1,4 +1,4 @@
-import { useState, useEffect, useCallback } from "react";
+import { useState, useEffect, useCallback, useRef, useMemo } from "react";
 import { LineChart, Line, XAxis, YAxis, CartesianGrid, Tooltip, ResponsiveContainer, ReferenceLine } from "recharts";
 
 // ─── CONSTANTS ───────────────────────────────────────────────────────────────
@@ -485,13 +485,16 @@ export default function App() {
   // COACH: FORM
   // ══════════════════════════════════════════════════════════════
   const FormView = () => {
+    const [localForm, setLocalForm] = useState(form);
+    const setLocalField = useCallback((k,v) => setLocalForm(f=>({...f,[k]:v})),[]);
+    const setLocalCVField = useCallback((k,v) => setLocalForm(f=>({...f,coreValues:{...f.coreValues,[k]:v}})),[]);
     if (submitted) return (
       <div style={S.page}>
         <div style={{...S.card,textAlign:"center",padding:36}}>
           
           <div style={{fontWeight:900,fontSize:18,color:"#C9A84C",marginBottom:6}}>提交成功 Submitted</div>
           <div style={{color:"#7A7060",fontSize:12,marginBottom:24}}>
-            {form.month} {form.year} Scorecard 已保存。Record saved successfully.
+            {localForm.month} {localForm.year} Scorecard 已保存。Record saved successfully.
           </div>
           <div style={{display:"flex",gap:10,justifyContent:"center",flexWrap:"wrap"}}>
             <button onClick={()=>setView("dashboard")} style={S.goldBtn(false)}>查看趋势图 View My Trends →</button>
@@ -502,10 +505,10 @@ export default function App() {
     );
 
     const handleSubmit = async () => {
-      if (!form.month || !form.year) { alert("请填写月份和年份 / Please select month and year"); return; }
+      if (!localForm.month || !localForm.year) { alert("请填写月份和年份 / Please select month and year"); return; }
       setSaving(true);
       const record = {
-        ...form,
+        ...localForm,
         id: makeId(),
         coachId: session.coachId,
         coachName: session.coachName,
@@ -530,15 +533,15 @@ export default function App() {
           <div style={S.r3}>
             <div style={S.fg}>
               <Label en="月份 Month" zh="" />
-              <Select value={form.month} onChange={v=>setField("month",v)} options={MONTHS} placeholder="选择" />
+              <Select value={localForm.month} onChange={v=>setLocalField("month",v)} options={MONTHS} placeholder="选择" />
             </div>
             <div style={S.fg}>
               <Label en="年份 Year" zh="" />
-              <Input value={form.year} onChange={v=>setField("year",v)} placeholder="2025" />
+              <Input value={localForm.year} onChange={v=>setLocalField("year",v)} placeholder="2025" />
             </div>
             <div style={S.fg}>
               <Label en="级别 Level" zh="" />
-              <Select value={form.level} onChange={v=>setField("level",v)} options={LEVELS} placeholder="选择" />
+              <Select value={localForm.level} onChange={v=>setLocalField("level",v)} options={LEVELS} placeholder="选择" />
             </div>
           </div>
         </div>
@@ -553,13 +556,13 @@ export default function App() {
             ].map(([k,en,zh,ph])=>(
               <div key={k} style={S.fg}>
                 <Label en={en} zh={zh} />
-                <Input value={form[k]} onChange={v=>setField(k,v)} placeholder={`例：${ph}`} type="number" />
+                <Input value={localForm[k]} onChange={v=>setLocalField(k,v)} placeholder={`例：${ph}`} type="number" />
               </div>
             ))}
           </div>
           <div style={S.fg}>
             <Label en="收入达标 Revenue Target" zh="Did you hit your monthly revenue goal?" />
-            <RadioGroup value={form.revenueTarget} onChange={v=>setField("revenueTarget",v)}
+            <RadioGroup value={localForm.revenueTarget} onChange={v=>setLocalField("revenueTarget",v)}
               options={["达标 Met","未达标 Not Met"]} />
           </div>
         </div>
@@ -570,16 +573,16 @@ export default function App() {
           <div style={S.r2}>
             <div style={S.fg}>
               <Label en="客户出席率 % Attendance" zh="Actual sessions ÷ scheduled sessions" />
-              <Input value={form.attendance} onChange={v=>setField("attendance",v)} placeholder="例：90" type="number" />
+              <Input value={localForm.attendance} onChange={v=>setLocalField("attendance",v)} placeholder="例：90" type="number" />
             </div>
             <div style={S.fg}>
               <Label en="计划执行率 % Plan Execution" zh="Sessions delivered as planned" />
-              <Input value={form.planExecution} onChange={v=>setField("planExecution",v)} placeholder="例：95" type="number" />
+              <Input value={localForm.planExecution} onChange={v=>setLocalField("planExecution",v)} placeholder="例：95" type="number" />
             </div>
           </div>
           <div style={S.fg}>
             <Label en="客户满意度 Satisfaction" zh="Average monthly client rating 1–5" />
-            <StarRow value={form.satisfaction} onChange={v=>setField("satisfaction",v)} />
+            <StarRow value={localForm.satisfaction} onChange={v=>setLocalField("satisfaction",v)} />
           </div>
         </div>
 
@@ -587,9 +590,9 @@ export default function App() {
         <div style={S.card}>
           <SectionHeader letter="C" en="成长指标 Growth — Coach Mastery Wheel" zh="Rate each dimension 1–10 · 每项1–10分，自动算总分" />
           {(() => {
-            const coachLvlIdx = LEVELS.indexOf(coaches[session?.coachId]?.level || form.level || "");
+            const coachLvlIdx = LEVELS.indexOf(coaches[session?.coachId]?.level || localForm.level || "");
             const eligibleDims = WHEEL_DIMS.filter(d=>coachLvlIdx>=d.minLevel);
-            const total = eligibleDims.reduce((sum,d)=>sum+(parseInt(form.wheelScores?.[d.id])||0),0);
+            const total = eligibleDims.reduce((sum,d)=>sum+(parseInt(localForm.wheelScores?.[d.id])||0),0);
             const maxTotal = eligibleDims.length * 10;
             const pct = Math.round((total/maxTotal)*100);
             return (
@@ -609,7 +612,7 @@ export default function App() {
             );
           })()}
           {(() => {
-            const coachLevel = coaches[session?.coachId]?.level || form.level || "";
+            const coachLevel = coaches[session?.coachId]?.level || localForm.level || "";
             const levelIdx = LEVELS.indexOf(coachLevel);
             // Group by eligibility
             const allLvl = WHEEL_DIMS.filter(d=>d.minLevel===0);
@@ -620,7 +623,7 @@ export default function App() {
 
             const renderDim = (d) => {
               const eligible = isEligible(d);
-              const val = eligible ? (parseInt(form.wheelScores?.[d.id])||0) : null;
+              const val = eligible ? (parseInt(localForm.wheelScores?.[d.id])||0) : null;
               return (
                 <div key={d.id} style={{marginBottom:14, opacity: eligible ? 1 : 0.35}}>
                   <div style={{display:"flex",justifyContent:"space-between",alignItems:"flex-start",marginBottom:4}}>
@@ -639,7 +642,7 @@ export default function App() {
                   {eligible ? (
                     <div style={{display:"flex",gap:3}}>
                       {[1,2,3,4,5,6,7,8,9,10].map(n=>(
-                        <button key={n} onClick={()=>setForm(f=>({...f,wheelScores:{...f.wheelScores,[d.id]:n.toString()}}))}
+                        <button key={n} onClick={()=>setLocalForm(f=>({...f,wheelScores:{...f.wheelScores,[d.id]:n.toString()}}))}
                           style={{flex:1,height:22,borderRadius:3,border:"none",cursor:"pointer",fontSize:9,fontWeight:700,transition:"all 0.1s",
                             background:val>=n?(n>=8?"#C9A84C":n>=5?"#8A7240":"#5A4A2A"):"#2A2420",
                             color:val>=n?"#1A1612":"#3A342C"}}>{n}</button>
@@ -697,11 +700,11 @@ export default function App() {
           <div style={{marginTop:16,paddingTop:12,borderTop:"1px solid #2A2420"}}>
             <div style={S.fg}>
               <Label en="Mentoring 行动完成率 Action Rate" zh="Last month's committed actions completed" />
-              <Input value={form.actionRate} onChange={v=>setField("actionRate",v)} placeholder="例：3/4" />
+              <Input value={localForm.actionRate} onChange={v=>setLocalField("actionRate",v)} placeholder="例：3/4" />
             </div>
             <div style={S.fg}>
               <Label en="完成 Curriculum 模块 Module" zh="Optional · 选填" />
-              <Input value={form.curriculumModule} onChange={v=>setField("curriculumModule",v)} placeholder="例：Module 2A" />
+              <Input value={localForm.curriculumModule} onChange={v=>setLocalField("curriculumModule",v)} placeholder="例：Module 2A" />
             </div>
           </div>
         </div>
@@ -715,12 +718,12 @@ export default function App() {
                 <span style={{fontWeight:700,fontSize:12,color:"#E8E0D4"}}>{cv.en}</span>
                 <span style={{marginLeft:6,fontSize:10,color:"#7A7060"}}>{cv.zh}</span>
               </div>
-              <StarRow value={form.coreValues[cv.id]} onChange={v=>setCVField(cv.id,v)} />
+              <StarRow value={localForm.coreValues[cv.id]} onChange={v=>setLocalCVField(cv.id,v)} />
             </div>
           ))}
           <div style={{marginTop:12,...S.fg}}>
             <Label en="本月体现说明 How I demonstrated these" zh="Write 1–3 specific actions · 写1–3 entries具体行动" />
-            <Textarea value={form.coreValuesNote} onChange={v=>setField("coreValuesNote",v)}
+            <Textarea value={localForm.coreValuesNote} onChange={v=>setLocalField("coreValuesNote",v)}
               placeholder="写 1–3  entries具体行动..." rows={3} />
           </div>
         </div>
@@ -730,17 +733,17 @@ export default function App() {
           <SectionHeader letter="E" en="月度反思 Monthly Reflection" zh="Honest reflection drives growth" />
           <div style={S.fg}>
             <Label en="本月最大成就 Biggest Achievement" zh="What are you most proud of this month?" />
-            <Textarea value={form.biggestAchievement} onChange={v=>setField("biggestAchievement",v)}
+            <Textarea value={localForm.biggestAchievement} onChange={v=>setLocalField("biggestAchievement",v)}
               placeholder="这个月你最自豪的一件事..." />
           </div>
           <div style={S.fg}>
             <Label en="下月 #1 Focus Next Month" zh="The one thing I want to improve most" />
-            <Textarea value={form.focusNextMonth} onChange={v=>setField("focusNextMonth",v)}
+            <Textarea value={localForm.focusNextMonth} onChange={v=>setLocalField("focusNextMonth",v)}
               placeholder="下个月最想提升的一件事..." />
           </div>
           <div style={S.fg}>
             <Label en="给 Mentor 的话 Message to Mentor" zh="Optional · What should Mentor focus on in our 1-on-1?" />
-            <Textarea value={form.mentorMessage} onChange={v=>setField("mentorMessage",v)}
+            <Textarea value={localForm.mentorMessage} onChange={v=>setLocalField("mentorMessage",v)}
               placeholder="想让 Mentor 在 1-on-1 特别关注的..." rows={2} />
           </div>
         </div>
@@ -750,7 +753,7 @@ export default function App() {
         <div style={S.card}>
           <SectionHeader letter="F" en="L.I.F.E. Wheel 生命轮" zh="John 1010 — Rate 1–10 · 每项1–10分" />
           {(() => {
-            const total = LIFE_WHEEL.reduce((sum,d)=>sum+(parseInt(form.lifeWheelScores?.[d.id])||0),0);
+            const total = LIFE_WHEEL.reduce((sum,d)=>sum+(parseInt(localForm.lifeWheelScores?.[d.id])||0),0);
             const maxTotal = LIFE_WHEEL.length * 10;
             const pct = Math.round((total/maxTotal)*100);
             return (
@@ -770,7 +773,7 @@ export default function App() {
             );
           })()}
           {LIFE_WHEEL.map(d=>{
-            const val = parseInt(form.lifeWheelScores?.[d.id])||0;
+            const val = parseInt(localForm.lifeWheelScores?.[d.id])||0;
             return (
               <div key={d.id} style={{marginBottom:12}}>
                 <div style={{display:"flex",justifyContent:"space-between",alignItems:"center",marginBottom:5}}>
@@ -782,7 +785,7 @@ export default function App() {
                 </div>
                 <div style={{display:"flex",gap:3}}>
                   {[1,2,3,4,5,6,7,8,9,10].map(n=>(
-                    <button key={n} onClick={()=>setForm(f=>({...f,lifeWheelScores:{...f.lifeWheelScores,[d.id]:n.toString()}}))}
+                    <button key={n} onClick={()=>setLocalForm(f=>({...f,lifeWheelScores:{...f.lifeWheelScores,[d.id]:n.toString()}}))}
                       style={{flex:1,height:22,borderRadius:3,border:"none",cursor:"pointer",fontSize:9,fontWeight:700,transition:"all 0.1s",
                         background:val>=n?(n>=8?"#C9A84C":n>=5?"#8A7240":"#5A4A2A"):"#2A2420",
                         color:val>=n?"#1A1612":"#3A342C"}}>
@@ -795,7 +798,7 @@ export default function App() {
           })}
           <div style={{marginTop:14,paddingTop:12,borderTop:"1px solid #2A2420"}}>
             <Label en="Life Wheel 反思 Reflection" zh="Optional · Which area needs most attention this month?" />
-            <Textarea value={form.lifeWheelNote||""} onChange={v=>setField("lifeWheelNote",v)}
+            <Textarea value={localForm.lifeWheelNote||""} onChange={v=>setLocalField("lifeWheelNote",v)}
               placeholder="写下你的 Life Wheel 观察或行动计划..." rows={2} />
           </div>
         </div>
